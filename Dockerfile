@@ -37,7 +37,8 @@ RUN pip3 install --upgrade pip && \
         --index-url https://download.pytorch.org/whl/cu124 && \
     pip3 install --no-cache-dir -r requirements.txt
 
-RUN pip3 install git+https://github.com/huggingface/diffusers
+RUN pip3 install git+https://github.com/huggingface/diffusers && \
+    pip3 install git+https://github.com/huggingface/transformers.git
 # 4) Copy rest of the code
 COPY . .
 
