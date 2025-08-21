@@ -37,8 +37,22 @@ RUN pip3 install --upgrade pip && \
         --index-url https://download.pytorch.org/whl/cu124 && \
     pip3 install --no-cache-dir -r requirements.txt
 
-RUN pip3 install git+https://github.com/huggingface/diffusers && \
-    pip3 install git+https://github.com/huggingface/transformers.git
+RUN pip3 uninstall -y transformers diffusers || true && \
+    pip3 install --no-cache-dir \
+      "transformers>=4.53.3" \
+      "accelerate>=0.33.0" \
+      "qwen-vl-utils>=0.0.8" && \
+    pip3 install --no-cache-dir "git+https://github.com/huggingface/diffusers@main"
+
+# Быстрая проверка наличия класса ещё на этапе сборки
+RUN python - <<'PY'
+import importlib, transformers, diffusers
+print("Transformers:", transformers.__version__)
+print("Diffusers:", diffusers.__version__)
+m = importlib.import_module("transformers")
+assert hasattr(m, "Qwen2_5_VLForConditionalGeneration"), "Нет Qwen2_5_VLForConditionalGeneration"
+print("OK: класс найден")
+PY
 # 4) Copy rest of the code
 COPY . .
 

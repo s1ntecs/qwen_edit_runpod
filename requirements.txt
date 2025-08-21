@@ -1,7 +1,8 @@
 # diffusers==0.34.0
 transformers
 # git+https://github.com/huggingface/diffusers
-diffusers
+git+https://github.com/huggingface/diffusers
+# diffusers
 accelerate
 sentencepiece
 # xformers
