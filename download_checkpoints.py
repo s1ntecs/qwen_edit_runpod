@@ -3,7 +3,7 @@ import torch
 
 from diffusers import QwenImageEditPipeline
 
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 
 # ------------------------- каталоги -------------------------
 os.makedirs("loras", exist_ok=True)
@@ -25,6 +25,14 @@ def fetch_lora():
     )
 
 
+def fetch_model():
+    snapshot_download(
+        repo_id="Qwen/Qwen-Image-Edit",
+        # local_dir="checkpoints/Qwen-Image-Edit"
+        # ничего не загружаем в память; просто кладём файлы
+    )
+
+
 # ------------------------- пайплайн -------------------------
 def get_pipeline():
     QwenImageEditPipeline.from_pretrained(
@@ -34,4 +42,5 @@ def get_pipeline():
 
 if __name__ == "__main__":
     fetch_lora()
-    get_pipeline()
+    fetch_model()
+    # get_pipeline()
