@@ -16,14 +16,7 @@ MAX_STEPS = 250
 TARGET_RES = 1024
 
 
-def _bf16_supported():
-    return hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported()
-
-
-if DEVICE == "cuda":
-    DTYPE = torch.bfloat16 if _bf16_supported() else torch.float16
-else:
-    DTYPE = torch.float32
+DTYPE = torch.bfloat16
 
 
 logger = RunPodLogger()
@@ -79,9 +72,9 @@ def compute_work_resolution(w, h, max_side=1024):
 # ------------------------- ЗАГРУЗКА МОДЕЛЕЙ ------------------------------ #
 repo_id = "Qwen/Qwen-Image-Edit"
 PIPELINE = QwenImageEditPipeline.from_pretrained(
-    repo_id,
-    torch_dtype=DTYPE
+    repo_id
 )
+
 PIPELINE.to(torch.bfloat16)
 PIPELINE.to(DEVICE)
 
@@ -122,6 +115,7 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
         # resize *both* init image and  control image to same, /8-aligned size
         image_pil = image_pil.resize((work_w, work_h),
                                      Image.Resampling.LANCZOS)
+        image_pil.convert("RGB")
         # ------------------ генерация ---------------- #
         images = PIPELINE(
             prompt=prompt,
