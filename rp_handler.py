@@ -76,8 +76,8 @@ PIPELINE = QwenImageEditPipeline.from_pretrained(
 PIPELINE.to(torch.bfloat16)
 PIPELINE.to(DEVICE)
 
-lora_path = "./flymy_qwen_image_edit_inscene_lora.safetensors"
-PIPELINE.load_lora_weights(lora_path)
+# lora_path = "./flymy_qwen_image_edit_inscene_lora.safetensors"
+# PIPELINE.load_lora_weights(lora_path)
 
 
 # ------------------------- ОСНОВНОЙ HANDLER ------------------------------ #
