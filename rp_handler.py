@@ -12,10 +12,19 @@ from runpod.serverless.modules.rp_logger import RunPodLogger
 # --------------------------- КОНСТАНТЫ ----------------------------------- #
 MAX_SEED = np.iinfo(np.int16).max
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-DTYPE = torch.bfloat16 if DEVICE == "cuda" else torch.float32
 MAX_STEPS = 250
-
 TARGET_RES = 1024
+
+
+def _bf16_supported():
+    return hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported()
+
+
+if DEVICE == "cuda":
+    DTYPE = torch.bfloat16 if _bf16_supported() else torch.float16
+else:
+    DTYPE = torch.float32
+
 
 logger = RunPodLogger()
 
