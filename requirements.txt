@@ -3,8 +3,8 @@ transformers
 # git+https://github.com/huggingface/diffusers
 git+https://github.com/huggingface/diffusers
 # diffusers
-# accelerate
-# sentencepiece
+accelerate
+sentencepiece
 # xformers
 opencv-python
 pandas
@@ -16,8 +16,8 @@ huggingface-hub
 aiohttp
 pyyaml
 importlib_metadata
-# peft
+peft
 
 # --- RunPod worker ---
 runpod                          
-# omegaconf
+omegaconf
