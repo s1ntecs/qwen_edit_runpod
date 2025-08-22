@@ -37,12 +37,20 @@ RUN pip3 install --upgrade pip && \
         --index-url https://download.pytorch.org/whl/cu124 && \
     pip3 install --no-cache-dir -r requirements.txt
 
+# до: вы удаляете/ставите transformers/diffusers
 RUN pip3 uninstall -y transformers diffusers || true && \
     pip3 install --no-cache-dir \
-      "transformers>=4.53.3" \
+      "transformers==4.53.3" \
       "accelerate>=0.33.0" \
-      "qwen-vl-utils>=0.0.8" && \
+      "qwen-vl-utils[decord]==0.0.8" \
+      "timm>=1.0.17" && \
     pip3 install --no-cache-dir "git+https://github.com/huggingface/diffusers@main"
+
+RUN python3 - <<'PY'
+from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2Tokenizer, Qwen2VLProcessor
+from diffusers import QwenImageEditPipeline
+print("✅ Transformers + Diffusers импорты ОК")
+PY
 
 # Быстрая проверка наличия класса ещё на этапе сборки
 # 4) Copy rest of the code
