@@ -78,7 +78,7 @@ PIPELINE = QwenImageEditPipeline.from_pretrained(
 PIPELINE.to(torch.bfloat16)
 PIPELINE.to(DEVICE)
 PIPELINE.disable_xformers_memory_efficient_attention()
-
+PIPELINE.set_progress_bar_config(disable=True)
 # lora_path = "./flymy_qwen_image_edit_inscene_lora.safetensors"
 # PIPELINE.load_lora_weights(lora_path)
 
