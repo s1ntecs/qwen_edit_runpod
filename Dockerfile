@@ -44,7 +44,7 @@ RUN pip3 uninstall -y transformers diffusers || true && \
       "accelerate>=0.33.0" \
       "qwen-vl-utils[decord]==0.0.8" \
       "timm>=1.0.17" && \
-    pip3 install --no-cache-dir "git+https://github.com/huggingface/diffusers@main"
+    pip3 install --no-cache-dir "git+https://github.com/huggingface/diffusers"
 
 RUN python3 - <<'PY'
 from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2Tokenizer, Qwen2VLProcessor

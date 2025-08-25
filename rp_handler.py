@@ -77,6 +77,7 @@ PIPELINE = QwenImageEditPipeline.from_pretrained(
 
 PIPELINE.to(torch.bfloat16)
 PIPELINE.to(DEVICE)
+PIPELINE.disable_xformers_memory_efficient_attention()
 
 # lora_path = "./flymy_qwen_image_edit_inscene_lora.safetensors"
 # PIPELINE.load_lora_weights(lora_path)
@@ -90,7 +91,7 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
         if not image_url:
             return {"error": "'image_url' is required"}
         prompt = payload.get("prompt")
-        negative_prompt = payload.get("negative_prompt", "")
+        negative_prompt = payload.get("negative_prompt", " ")
         if not prompt:
             return {"error": "'prompt' is required"}
 
@@ -125,6 +126,7 @@ def handler(job: Dict[str, Any]) -> Dict[str, Any]:
             true_cfg_scale=true_cfg_scale,
             generator=generator,
         ).images
+        images.append(image_pil)
 
         return {
             "images_base64": [pil_to_b64(i) for i in images],
