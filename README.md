@@ -1,6 +1,6 @@
-# Qwen-Image-Edit-2509 Serverless Container
+# Qwen-Image-Edit-2509 RunPod Serverless
 
-Production-ready serverless containers for **Qwen-Image-Edit-2509** with **multi-image input** support for both **RunPod Serverless** and **Replicate COG**.
+Production-ready serverless container for **Qwen-Image-Edit-2509** with **multi-image input** support for **RunPod Serverless**.
 
 ## Features
 
@@ -10,9 +10,10 @@ Production-ready serverless containers for **Qwen-Image-Edit-2509** with **multi
 - Person + Scene composition
 - Enhanced identity preservation across multiple subjects
 
-🚀 **Dual Platform Support**
-- RunPod Serverless with REST API
-- Replicate COG container for easy deployment
+🚀 **RunPod Serverless**
+- REST API endpoint
+- Auto-scaling GPU workers
+- Fast cold start optimization
 
 🎯 **Optimized Parameters**
 - Uses latest `Qwen-Image-Edit-2509` model
@@ -30,37 +31,25 @@ Production-ready serverless containers for **Qwen-Image-Edit-2509** with **multi
 
 ## Installation & Setup
 
-### 1. Clone Repository
+### Быстрый старт
 
 ```bash
+# 1. Клонируйте репозиторий
 git clone <your-repo-url>
 cd qwen_edit_runpod
+
+# 2. Соберите Docker образ
+./build_runpod.sh --hf-token YOUR_HF_TOKEN --push --registry dockerhub.io/username/qwen-edit
+
+# 3. Деплой на RunPod
+# Следуйте инструкциям в RUNPOD_DEPLOY.md
 ```
 
-### 2. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Download Model Weights
-
-```bash
-python download_checkpoints.py
-```
-
-This will:
-- Download Qwen-Image-Edit-2509 model
-- Cache it in `checkpoints/` directory
-- Verify pipeline loading
+Полное руководство: **[RUNPOD_DEPLOY.md](RUNPOD_DEPLOY.md)**
 
 ## Usage
 
-### RunPod Serverless
-
-Deploy `rp_handler.py` as a RunPod serverless endpoint.
-
-#### Single Image Input
+### Single Image Input
 
 ```python
 import requests
@@ -107,36 +96,6 @@ result = response.json()
 # - images_base64: list of base64 encoded images
 # - num_input_images: number of input images processed
 # - steps, seed, true_cfg_scale, guidance_scale
-```
-
-### Replicate COG
-
-Build and deploy using COG:
-
-```bash
-cog predict -i image1=@input1.png -i prompt="Edit description"
-```
-
-#### Multi-Image with COG
-
-```bash
-cog predict \
-  -i image1=@person1.jpg \
-  -i image2=@person2.jpg \
-  -i prompt="The magician bear is on the left, the alchemist bear is on the right, facing each other in the central park square" \
-  -i num_inference_steps=40 \
-  -i true_cfg_scale=4.0 \
-  -i guidance_scale=1.0 \
-  -i seed=0
-```
-
-Optional third image:
-```bash
-cog predict \
-  -i image1=@person.jpg \
-  -i image2=@product.jpg \
-  -i image3=@background.jpg \
-  -i prompt="Person holding product in the background scene"
 ```
 
 ## API Parameters
@@ -202,47 +161,15 @@ cog predict \
 }
 ```
 
-## Docker Deployment
+## Docker Build
 
-### RunPod Serverless
+Используйте включенный build скрипт для сборки:
 
-```dockerfile
-FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-RUN python download_checkpoints.py
-
-CMD ["python", "rp_handler.py"]
-```
-
-### Replicate COG
-
-Create `cog.yaml`:
-
-```yaml
-build:
-  gpu: true
-  python_version: "3.10"
-  python_packages:
-    - "torch==2.1.0"
-    - "diffusers"
-    - "transformers"
-    - "accelerate"
-    - "Pillow"
-predict: "predict.py:Predictor"
-```
-
-Then build and push:
 ```bash
-cog build
-cog push r8.im/your-username/qwen-image-edit-2509
+./build_runpod.sh --hf-token YOUR_HF_TOKEN
 ```
+
+Подробные инструкции: [RUNPOD_DEPLOY.md](RUNPOD_DEPLOY.md)
 
 ## Requirements
 
@@ -290,7 +217,7 @@ pipe = QwenImageEditPlusPipeline.from_pretrained("Qwen/Qwen-Image-Edit-2509")
 
 - Model: [Qwen/Qwen-Image-Edit-2509](https://huggingface.co/Qwen/Qwen-Image-Edit-2509) by Alibaba Qwen Team
 - Based on Qwen-Image architecture with multi-image training
-- Serverless implementation for RunPod and Replicate platforms
+- RunPod Serverless implementation
 
 ## License
 

@@ -1,23 +1,23 @@
-# diffusers==0.34.0
-transformers
-# git+https://github.com/huggingface/diffusers
-git+https://github.com/huggingface/diffusers
-# diffusers
-accelerate
+# Core ML dependencies
+transformers==4.53.3
+accelerate>=0.33.0
 sentencepiece
-# xformers
-opencv-python
-pandas
+timm>=1.0.17
+qwen-vl-utils[decord]==0.0.8
+
+# Image processing
 Pillow
-mediapipe
+opencv-python
 
+# Diffusers (latest for Qwen-Image-Edit-2509)
+git+https://github.com/huggingface/diffusers
+
+# Model management
 huggingface-hub
-
-aiohttp
-pyyaml
-importlib_metadata
 peft
 
-# --- RunPod worker ---
-runpod                          
+# RunPod serverless dependencies
+runpod
+aiohttp
+pyyaml
 omegaconf

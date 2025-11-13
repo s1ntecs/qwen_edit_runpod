@@ -6,12 +6,61 @@
 .git
 .github
 .gitignore
+.gitattributes
 
 # Exclude Python cache files
 __pycache__
 .mypy_cache
 .pytest_cache
 .ruff_cache
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist/
+build/
 
 # Exclude Python virtual environment
 /venv
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Model checkpoints (downloaded during build)
+checkpoints/*
+loras/*
+*.safetensors
+*.ckpt
+*.pth
+*.bin
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+test_*.py
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# Replicate COG (not needed for RunPod)
+cog.yaml
+predict.py
+
+# Temp files
+tmp/
+temp/
+*.tmp
