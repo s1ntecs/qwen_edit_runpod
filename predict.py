@@ -2,162 +2,142 @@
 # https://cog.run/python
 
 import os
-
+import time
 import torch
 import mimetypes
-import subprocess
-import numpy as np
 from PIL import Image
-from typing import Tuple, Iterator
-from diffusers import FluxInpaintPipeline
+from typing import List, Iterator
+from diffusers import QwenImageEditPlusPipeline
 from cog import BasePredictor, Input, Path
 
 mimetypes.add_type("image/webp", ".webp")
 
-
-def download_weights(url: str, dest: str) -> None:
-    start = time.time()
-    print("[!] Initiating download from URL: ", url)
-    print("[~] Destination path: ", dest)
-    if ".tar" in dest:
-        dest = os.path.dirname(dest)
-    command = ["pget", "-vf" + ("x" if ".tar" in url else ""), url, dest]
-    try:
-        print(f"[~] Running command: {' '.join(command)}")
-        subprocess.check_call(command, close_fds=False)
-    except subprocess.CalledProcessError as e:
-        print(
-            f"[ERROR] Failed to download weights. Command '{' '.join(e.cmd)}' returned non-zero exit status {e.returncode}."
-        )
-        raise
-    print("[+] Download completed in: ", time.time() - start, "seconds")
+MODEL_NAME = "Qwen/Qwen-Image-Edit-2509"
+MODEL_CACHE = "checkpoints"
 
 
 class Predictor(BasePredictor):
     def setup(self) -> None:
-        print(f"[~] Model type: {MODEL_TYPE}")
-
-        if not os.path.exists(MODEL_CACHE):
-            os.makedirs(MODEL_CACHE)
-        model_files = [f"models--black-forest-labs--FLUX.1-{MODEL_TYPE}.tar"]
-        for model_file in model_files:
-            url = BASE_URL + model_file
-            filename = url.split("/")[-1]
-            dest_path = os.path.join(MODEL_CACHE, filename)
-            if not os.path.exists(dest_path.replace(".tar", "")):
-                download_weights(url, dest_path)
+        """Load Qwen-Image-Edit-2509 model"""
+        print(f"[~] Loading model: {MODEL_NAME}")
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.pipe = FluxInpaintPipeline.from_pretrained(
-            f"black-forest-labs/FLUX.1-{MODEL_TYPE}",
+        self.pipe = QwenImageEditPlusPipeline.from_pretrained(
+            MODEL_NAME,
             torch_dtype=torch.bfloat16,
             cache_dir=MODEL_CACHE,
-            local_files_only=True,
         ).to(self.device)
+        self.pipe.set_progress_bar_config(disable=True)
+        print("[+] Model loaded successfully")
 
     def predict(
         self,
-        image: Path = Input(description="Input image for inpainting"),
-        mask: Path = Input(description="Mask image"),
-        prompt: str = Input(description="Text prompt for inpainting"),
-        strength: float = Input(
-            description="Strength of inpainting. Higher values allow for more deviation from the original image.",
-            default=0.85,
-            ge=0,
-            le=1,
+        image1: Path = Input(description="First input image (required)"),
+        image2: Path = Input(description="Second input image (optional, for multi-image editing)", default=None),
+        image3: Path = Input(description="Third input image (optional, for multi-image editing)", default=None),
+        prompt: str = Input(description="Text prompt describing the desired edit"),
+        negative_prompt: str = Input(
+            description="Negative prompt to guide what to avoid",
+            default=" "
         ),
         num_inference_steps: int = Input(
-            description="Number of denoising steps. More steps usually lead to a higher quality image at the expense of slower inference.",
-            default=30,
+            description="Number of denoising steps. Recommended: 40 for Qwen-Image-Edit-2509",
+            default=40,
             ge=1,
-            le=50,
+            le=100,
         ),
         guidance_scale: float = Input(
-            description="Guidance scale as defined in Classifier-Free Diffusion Guidance. Higher guidance scale encourages images that are closely linked to the text prompt, usually at the expense of lower image quality.",
-            default=7.0,
+            description="Guidance scale for image generation",
+            default=1.0,
             ge=1.0,
             le=20.0,
         ),
-        height: int = Input(
-            description="Height of the output image. Will be rounded to the nearest multiple of 8.",
-            default=1024,
-            ge=128,
-            le=2048,
+        true_cfg_scale: float = Input(
+            description="True CFG scale parameter for Qwen model",
+            default=4.0,
+            ge=1.0,
+            le=10.0,
         ),
-        width: int = Input(
-            description="Width of the output image. Will be rounded to the nearest multiple of 8.",
-            default=1024,
-            ge=128,
-            le=2048,
-        ),
-        num_outputs: int = Input(
-            description="Number of images to generate per prompt. Batch size is set to 1",
+        num_images_per_prompt: int = Input(
+            description="Number of images to generate per prompt",
             default=1,
             ge=1,
-            le=8,
+            le=4,
         ),
         seed: int = Input(
-            description="Random seed. Leave blank to randomize the seed", default=None
+            description="Random seed. Leave blank to randomize the seed",
+            default=None
         ),
         output_format: str = Input(
             description="Format of the output image",
             choices=["webp", "jpg", "png"],
-            default="webp",
+            default="png",
         ),
         output_quality: int = Input(
             description="Quality of the output image, from 0 to 100. 100 is best quality, 0 is lowest quality.",
-            default=80,
+            default=95,
             ge=0,
             le=100,
         ),
     ) -> Iterator[Path]:
+        """
+        Run Qwen-Image-Edit-2509 for single or multi-image editing
+        Supports 1-3 input images for optimal performance
+        """
         if not prompt:
             raise ValueError("Please enter a text prompt.")
 
         if seed is None:
             seed = int.from_bytes(os.urandom(4), "big")
-        print(f"Using seed: {seed}")
+        print(f"[~] Using seed: {seed}")
 
-        # Ensure height and width are divisible by 8
-        height = (height + 7) // 8 * 8
-        width = (width + 7) // 8 * 8
+        # Load input images
+        images = [Image.open(image1).convert("RGB")]
+        num_images = 1
 
-        # Load images
-        input_image = Image.open(image).convert("RGB")
-        mask_image = Image.open(mask).convert("RGB")
+        if image2 is not None:
+            images.append(Image.open(image2).convert("RGB"))
+            num_images += 1
+
+        if image3 is not None:
+            images.append(Image.open(image3).convert("RGB"))
+            num_images += 1
+
+        print(f"[~] Processing {num_images} input image(s)")
+
+        # For compatibility: single image as object, multiple as list
+        pipeline_input = images if num_images > 1 else images[0]
 
         # Generate images
-        for i in range(num_outputs):
-            generator = torch.Generator(device=self.device).manual_seed(seed + i)
+        generator = torch.Generator(device=self.device).manual_seed(seed)
 
+        print("[~] Running inference...")
+        with torch.inference_mode():
             result = self.pipe(
                 prompt=prompt,
-                image=input_image,
-                mask_image=mask_image,
-                height=height,
-                width=width,
-                strength=strength,
+                negative_prompt=negative_prompt,
+                image=pipeline_input,
                 generator=generator,
                 num_inference_steps=num_inference_steps,
                 guidance_scale=guidance_scale,
-            ).images[
-                0
-            ]  # We're only generating one image at a time
+                true_cfg_scale=true_cfg_scale,
+                num_images_per_prompt=num_images_per_prompt,
+            )
 
-            # Save the result
-            extension = output_format.lower()
-            extension = "jpeg" if extension == "jpg" else extension
+        # Save and yield results
+        extension = output_format.lower()
+        extension = "jpeg" if extension == "jpg" else extension
+
+        for i, output_image in enumerate(result.images):
             output_path = f"/tmp/output_{i}.{extension}"
 
             print(f"[~] Saving to {output_path}...")
-            print(f"[~] Output format: {extension.upper()}")
-            if output_format != "png":
-                print(f"[~] Output quality: {output_quality}")
-
             save_params = {"format": extension.upper()}
             if output_format != "png":
                 save_params["quality"] = output_quality
                 save_params["optimize"] = True
 
-            result.save(output_path, **save_params)
+            output_image.save(output_path, **save_params)
             yield Path(output_path)
+
+        print("[+] Generation completed successfully")

@@ -48,8 +48,8 @@ RUN pip3 uninstall -y transformers diffusers || true && \
 
 RUN python3 - <<'PY'
 from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2Tokenizer, Qwen2VLProcessor
-from diffusers import QwenImageEditPipeline
-print("✅ Transformers + Diffusers импорты ОК")
+from diffusers import QwenImageEditPlusPipeline
+print("✅ Transformers + Diffusers импорты ОК (QwenImageEditPlusPipeline)")
 PY
 
 # Быстрая проверка наличия класса ещё на этапе сборки

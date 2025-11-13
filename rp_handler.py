@@ -1,9 +1,9 @@
 # import cv2
 import base64, io, random, time, numpy as np, torch
-from typing import Any, Dict
+from typing import Any, Dict, List, Union
 from PIL import Image
 
-from diffusers import QwenImageEditPipeline
+from diffusers import QwenImageEditPlusPipeline
 
 import runpod
 from runpod.serverless.utils.rp_download import file as rp_file
@@ -14,6 +14,7 @@ MAX_SEED = np.iinfo(np.int16).max
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 MAX_STEPS = 250
 TARGET_RES = 1024
+DEFAULT_NUM_INFERENCE_STEPS = 40  # Qwen-Image-Edit-2509 рекомендует 40
 
 
 DTYPE = torch.bfloat16
@@ -48,6 +49,13 @@ def url_to_pil(url: str) -> Image.Image:
     return Image.open(info["file_path"]).convert("RGB")
 
 
+def urls_to_pil_list(urls: Union[str, List[str]]) -> List[Image.Image]:
+    """Конвертирует URL или список URLs в список PIL изображений"""
+    if isinstance(urls, str):
+        urls = [urls]
+    return [url_to_pil(url) for url in urls]
+
+
 def pil_to_b64(img: Image.Image) -> str:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -70,14 +78,13 @@ def compute_work_resolution(w, h, max_side=1024):
 
 
 # ------------------------- ЗАГРУЗКА МОДЕЛЕЙ ------------------------------ #
-repo_id = "Qwen/Qwen-Image-Edit"
-PIPELINE = QwenImageEditPipeline.from_pretrained(
-    repo_id
+repo_id = "Qwen/Qwen-Image-Edit-2509"
+PIPELINE = QwenImageEditPlusPipeline.from_pretrained(
+    repo_id,
+    torch_dtype=torch.bfloat16
 )
 
-PIPELINE.to(torch.bfloat16)
 PIPELINE.to(DEVICE)
-PIPELINE.disable_xformers_memory_efficient_attention()
 PIPELINE.set_progress_bar_config(disable=True)
 # lora_path = "./flymy_qwen_image_edit_inscene_lora.safetensors"
 # PIPELINE.load_lora_weights(lora_path)
@@ -87,52 +94,75 @@ PIPELINE.set_progress_bar_config(disable=True)
 def handler(job: Dict[str, Any]) -> Dict[str, Any]:
     try:
         payload = job.get("input", {})
-        image_url = payload.get("image_url")
-        if not image_url:
-            return {"error": "'image_url' is required"}
+
+        # Поддержка как старого API (image_url), так и нового (image_urls)
+        image_urls = payload.get("image_urls") or payload.get("image_url")
+        if not image_urls:
+            return {"error": "'image_urls' or 'image_url' is required"}
+
         prompt = payload.get("prompt")
-        negative_prompt = payload.get("negative_prompt", " ")
         if not prompt:
             return {"error": "'prompt' is required"}
 
-        true_cfg_scale = float(payload.get(
-            "true_cfg_scale", 4.0))
+        negative_prompt = payload.get("negative_prompt", " ")
 
-        steps = min(int(payload.get(
-            "steps", MAX_STEPS)),
-                    MAX_STEPS)
+        # Параметры Qwen-Image-Edit-2509
+        true_cfg_scale = float(payload.get("true_cfg_scale", 4.0))
+        guidance_scale = float(payload.get("guidance_scale", 1.0))
 
-        seed = int(payload.get(
-            "seed",
-            random.randint(0, MAX_SEED)))
-        generator = torch.Generator(
-            device=DEVICE).manual_seed(seed)
+        steps = min(
+            int(payload.get("num_inference_steps") or payload.get("steps", DEFAULT_NUM_INFERENCE_STEPS)),
+            MAX_STEPS
+        )
 
-        image_pil = url_to_pil(image_url)
+        num_images_per_prompt = int(payload.get("num_images_per_prompt", 1))
 
-        orig_w, orig_h = image_pil.size
+        seed = int(payload.get("seed", random.randint(0, MAX_SEED)))
+        generator = torch.Generator(device=DEVICE).manual_seed(seed)
+
+        # Загружаем изображения (поддержка multi-image input)
+        image_pils = urls_to_pil_list(image_urls)
+        logger.info(f"Loaded {len(image_pils)} input image(s)")
+
+        # Определяем рабочее разрешение на основе первого изображения
+        orig_w, orig_h = image_pils[0].size
         work_w, work_h = compute_work_resolution(orig_w, orig_h, TARGET_RES)
 
-        # resize *both* init image and  control image to same, /8-aligned size
-        image_pil = image_pil.resize((work_w, work_h),
-                                     Image.Resampling.LANCZOS)
-        image_pil.convert("RGB")
+        # Resize всех изображений до одинакового размера
+        resized_images = []
+        for img in image_pils:
+            resized = img.resize((work_w, work_h), Image.Resampling.LANCZOS)
+            resized_images.append(resized.convert("RGB"))
+
+        # Для совместимости: если только одно изображение, передаем его напрямую
+        # Если несколько - передаем список
+        pipeline_input = resized_images if len(resized_images) > 1 else resized_images[0]
+
         # ------------------ генерация ---------------- #
-        images = PIPELINE(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            image=image_pil,
-            num_inference_steps=steps,
-            true_cfg_scale=true_cfg_scale,
-            generator=generator,
-        ).images
-        images.append(image_pil)
+        with torch.inference_mode():
+            output = PIPELINE(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                image=pipeline_input,
+                num_inference_steps=steps,
+                true_cfg_scale=true_cfg_scale,
+                guidance_scale=guidance_scale,
+                generator=generator,
+                num_images_per_prompt=num_images_per_prompt,
+            )
+            result_images = output.images
+
+        # Добавляем входные изображения для сравнения
+        result_images.extend(resized_images)
 
         return {
-            "images_base64": [pil_to_b64(i) for i in images],
-            "time": round(time.time() - job["created"],
-                          2) if "created" in job else None,
-            "steps": steps, "seed": seed
+            "images_base64": [pil_to_b64(i) for i in result_images],
+            "time": round(time.time() - job["created"], 2) if "created" in job else None,
+            "num_input_images": len(image_pils),
+            "steps": steps,
+            "seed": seed,
+            "true_cfg_scale": true_cfg_scale,
+            "guidance_scale": guidance_scale,
         }
 
     except (torch.cuda.OutOfMemoryError, RuntimeError) as exc:
