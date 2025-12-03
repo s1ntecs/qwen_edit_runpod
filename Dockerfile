@@ -9,10 +9,10 @@ RUN pip install --no-cache-dir diffusers transformers accelerate safetensors pil
 
 # Copy handler file
 WORKDIR /app
-COPY handler.py .
+COPY rp_handler.py .
 COPY download_checkpoints.py .
 
 RUN python download_checkpoints.py
 
 # Set entrypoint
-CMD ["python", "handler.py"]
+CMD ["python", "rp_handler.py"]
