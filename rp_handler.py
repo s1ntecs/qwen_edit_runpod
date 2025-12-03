@@ -37,7 +37,6 @@ def handler(job):
         input_image = load_image(image_url)
         with torch.inference_mode():
             output_image = pipe(image=input_image,
-                                seed=seed,
                                 num_inference_steps=steps,
                                 true_cfg_scale=cfg_scale,
                                 prompt=prompt).images[0]
@@ -47,7 +46,8 @@ def handler(job):
             "images_base64": [b_64_img],
             "time": round(time.time() - job["created"],
                           2) if "created" in job else None,
-            "steps": steps, "seed": seed
+            "steps": steps,
+            "seed": "N/A"
         }
     except Exception as e:
         return {"error": str(e)}
