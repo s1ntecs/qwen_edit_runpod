@@ -1,70 +1,18 @@
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+# Use a modern Runpod PyTorch base image
+FROM runpod/pytorch:1.0.2-cu1281-torch271-ubuntu2204
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=off \
-    SHELL=/bin/bash
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Install dependencies
+RUN pip install --no-cache-dir diffusers transformers accelerate safetensors pillow runpod hf_transfer bitsandbytes git+https://github.com/huggingface/diffusers
 
-# 1) System deps
-RUN apt update && \
-    apt install -y --no-install-recommends \
-      python3-dev python3-pip python3.10-venv \
-      fonts-dejavu-core git git-lfs jq wget curl \
-      libglib2.0-0 libsm6 libgl1 libxrender1 libxext6 \
-      ffmpeg procps && \
-    rm -rf /var/lib/apt/lists/* && \
-    git lfs install
+# (Optional) Pre-download the model to reduce cold start latency
+# RUN python -c "from diffusers import DiffusionPipeline; DiffusionPipeline.from_pretrained('Qwen/Qwen-Image-Edit-2509')"
 
-WORKDIR /workspace
+# Copy handler file
+WORKDIR /app
+COPY handler.py .
+COPY download_checkpoints.py .
 
-# 2) Copy requirements
-COPY requirements.txt .
+RUN python download_checkpoints.py
 
-# 3) Install torch + torchvision + torchaudio + xformers (all pinned) with retries
-RUN pip3 install --upgrade pip && \
-    pip3 install \
-      --no-cache-dir \
-      --timeout=120 \
-      --retries=5 \
-      torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 \
-        --index-url https://download.pytorch.org/whl/cu124 && \
-    pip3 install \
-      --no-cache-dir \
-      --timeout=120 \
-      --retries=5 \
-      xformers==0.0.28.post1 \
-        --index-url https://download.pytorch.org/whl/cu124 && \
-    pip3 install --no-cache-dir -r requirements.txt
-
-# до: вы удаляете/ставите transformers/diffusers
-RUN pip3 uninstall -y transformers diffusers || true && \
-    pip3 install --no-cache-dir \
-      "transformers==4.53.3" \
-      "accelerate>=0.33.0" \
-      "qwen-vl-utils[decord]==0.0.8" \
-      "timm>=1.0.17" && \
-    pip3 install --no-cache-dir "git+https://github.com/huggingface/diffusers"
-
-RUN python3 - <<'PY'
-from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2Tokenizer, Qwen2VLProcessor
-from diffusers import QwenImageEditPipeline
-print("✅ Transformers + Diffusers импорты ОК")
-PY
-
-# Быстрая проверка наличия класса ещё на этапе сборки
-# 4) Copy rest of the code
-COPY . .
-
-ARG HF_TOKEN
-ENV HF_TOKEN=${HF_TOKEN}
-
-RUN huggingface-cli login --token $HF_TOKEN --add-to-git-credential
-
-# 5) Prepare dirs & checkpoints
-RUN mkdir -p loras checkpoints && \
-    python3 download_checkpoints.py
-
-# 6) Entry point
-COPY --chmod=755 start_standalone.sh /start.sh
-ENTRYPOINT ["/start.sh"]
+# Set entrypoint
+CMD ["python", "handler.py"]

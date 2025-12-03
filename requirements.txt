@@ -1,23 +1,7 @@
-# diffusers==0.34.0
+torch
+diffusers
 transformers
-# git+https://github.com/huggingface/diffusers
-git+https://github.com/huggingface/diffusers
-# diffusers
 accelerate
-sentencepiece
-# xformers
-opencv-python
-pandas
-Pillow
-mediapipe
-
-huggingface-hub
-
-aiohttp
-pyyaml
-importlib_metadata
-peft
-
-# --- RunPod worker ---
-runpod                          
-omegaconf
+safetensors
+pillow
+runpod

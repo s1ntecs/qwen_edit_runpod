@@ -1,16 +1,8 @@
-import os
 import torch
 
-from diffusers import QwenImageEditPipeline
+from diffusers import DiffusionPipeline
 
 from huggingface_hub import hf_hub_download, snapshot_download
-
-# ------------------------- каталоги -------------------------
-os.makedirs("loras", exist_ok=True)
-os.makedirs("checkpoints", exist_ok=True)
-
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-DTYPE = torch.float16 if DEVICE == "cuda" else torch.float32
 
 
 def fetch_lora():
@@ -25,22 +17,21 @@ def fetch_lora():
     )
 
 
+# def fetch_model():
+#     snapshot_download(
+#         repo_id="Qwen/Qwen-Image-Edit",
+#         # local_dir="checkpoints/Qwen-Image-Edit"
+#         # ничего не загружаем в память; просто кладём файлы
+#     )
+
+
 def fetch_model():
-    snapshot_download(
-        repo_id="Qwen/Qwen-Image-Edit",
-        # local_dir="checkpoints/Qwen-Image-Edit"
-        # ничего не загружаем в память; просто кладём файлы
-    )
-
-
-# ------------------------- пайплайн -------------------------
-def get_pipeline():
-    QwenImageEditPipeline.from_pretrained(
-        "Qwen/Qwen-Image-Edit"
+    DiffusionPipeline.from_pretrained(
+        "Qwen/Qwen-Image-Edit-2509", torch_dtype=torch.bfloat16
     )
 
 
 if __name__ == "__main__":
-    fetch_lora()
+    # fetch_lora()
     fetch_model()
     # get_pipeline()
